@@ -1,0 +1,481 @@
+openapi: 3.0.4
+info:
+  title: Emitix - API DFe
+  description: Documentação Swagguer dos contratos de requisição.
+  version: 1.0.0
+tags:
+  - name: Locatários
+    description: Endpoints para registo e gestão de Locatários (Empresas/Organizações).
+  - name: Usuários
+    description: Endpoints para gestão de usuários dentro de um Locatário.
+  - name: Autenticação
+    description: Endpoints para autenticação de usuários.
+
+paths:
+  # ===================================================================
+  # == LOCATÁRIOS
+  # ===================================================================
+  /locatarios/registrar:
+    post:
+      tags:
+        - Locatários
+      summary: Regista um novo Locatário e o seu primeiro usuário (Admin).
+      description: Este é o ponto de entrada para uma nova empresa. Cria o Locatário e o usuário administrador numa única operação.
+      operationId: registrarLocatario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroLocatarioRequest'
+      responses:
+        '201':
+          description: Locatário e usuário admin criados com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocatarioResponse'
+        '422':
+          description: "Erro de validação nos dados enviados (ex: CNPJ/Email já existem)."
+
+  /locatarios/{locatarioId}:
+    get:
+      tags:
+        - Locatários
+      summary: Obtém os detalhes de um Locatário específico.
+      description: Retorna as informações do Locatário com base no ID fornecido. Apenas usuários autenticados do próprio locatário podem aceder.
+      operationId: getLocatarioById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocatarioResponse'
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido (Acesso a locatário de terceiros).
+        '404':
+          description: Locatário não encontrado.
+    put:
+      tags:
+        - Locatários
+      summary: Atualiza as informações de um Locatário.
+      description: Atualiza os dados de um locatário. Apenas usuários com permissão podem executar esta ação.
+      operationId: updateLocatario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtualizacaoLocatarioRequest'
+      responses:
+        '200':
+          description: Locatário atualizado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocatarioResponse'
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Locatário não encontrado.
+    delete:
+      tags:
+        - Locatários
+      summary: Desativa um Locatário.
+      description: Marca um locatário como inativo. Esta é uma operação destrutiva e deve ser usada com cuidado.
+      operationId: deleteLocatario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Locatário desativado com sucesso.
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Locatário não encontrado.
+
+  # ===================================================================
+  # == USUÁRIOS
+  # ===================================================================
+  /locatarios/{locatarioId}/usuarios:
+    get:
+      tags:
+        - Usuários
+      summary: Lista todos os usuários de um Locatário.
+      operationId: listarUsuariosDoLocatario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de usuários.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Locatário não encontrado.
+    post:
+      tags:
+        - Usuários
+      summary: Cadastra (convida) um novo usuário para um Locatário existente.
+      description: Apenas usuários autenticados e com permissão podem adicionar novos membros ao seu Locatário.
+      operationId: convidarUsuarioParaLocatario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          description: O ID do Locatário (UUID) ao qual o usuário será adicionado.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CriacaoUsuarioRequest'
+      responses:
+        '201':
+          description: Usuário convidado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          description: Não autorizado (token inválido ou ausente).
+        '403':
+          description: Proibido (usuário não tem permissão para adicionar membros).
+        '404':
+          description: Locatário não encontrado.
+
+  /locatarios/{locatarioId}/usuarios/{usuarioId}:
+    get:
+      tags:
+        - Usuários
+      summary: Obtém detalhes de um usuário específico.
+      operationId: getUsuarioById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: usuarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalhes do usuário.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Recurso não encontrado.
+    put:
+      tags:
+        - Usuários
+      summary: Atualiza um usuário.
+      operationId: updateUsuario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: usuarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtualizacaoUsuarioRequest'
+      responses:
+        '200':
+          description: Usuário atualizado com sucesso.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioResponse'
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Recurso não encontrado.
+    delete:
+      tags:
+        - Usuários
+      summary: Remove um usuário de um Locatário.
+      operationId: deleteUsuario
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: locatarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: usuarioId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Usuário removido com sucesso.
+        '401':
+          description: Não autorizado.
+        '403':
+          description: Proibido.
+        '404':
+          description: Recurso não encontrado.
+  # ===================================================================
+  # == AUTENTICAÇÃO
+  # ===================================================================
+  /auth/login:
+    post:
+      tags:
+        - Autenticação
+      summary: Realiza login num Locatário específico.
+      description: Autentica um usuário usando seu e-mail, senha e o número do documento do Locatário (CNPJ/CPF). Retorna um token JWT com o escopo do Locatário.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login bem-sucedido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Credenciais inválidas ou locatário incorreto.
+
+components:
+  schemas:
+    LocatarioResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 'a1b2c3d4-e5f6-7890-1234-567890abcdef'
+        razao_social:
+          type: string
+          example: 'ACME Corp LTDA'
+        nome_fantasia:
+          type: string
+          example: 'ACME Corp'
+        numero_documento:
+          type: string
+          example: '12.345.678/0001-99'
+        email:
+          type: string
+          format: email
+          example: 'contato@acme.com'
+        is_ativo:
+          type: boolean
+          example: true
+
+    RegistroLocatarioRequest:
+      type: object
+      required:
+        - razao_social
+        - numero_documento
+        - email
+        - adminUser
+      properties:
+        razao_social:
+          type: string
+          example: 'ACME Corp LTDA'
+        nome_fantasia:
+          type: string
+          example: 'ACME Corp'
+        numero_documento:
+          type: string
+          description: CNPJ ou CPF do locatário.
+          example: '12.345.678/0001-99'
+        email:
+          type: string
+          format: email
+          description: Email principal do locatário.
+          example: 'contato@acme.com'
+        telefone:
+          type: string
+          example: '11999998888'
+        adminUser:
+          $ref: '#/components/schemas/CriacaoUsuarioRequest'
+
+    AtualizacaoLocatarioRequest:
+      type: object
+      properties:
+        razao_social:
+          type: string
+          example: 'ACME Corp LTDA'
+        nome_fantasia:
+          type: string
+          example: 'ACME Corp'
+        email:
+          type: string
+          format: email
+          description: Email principal do locatário.
+          example: 'contato@acme.com'
+        telefone:
+          type: string
+          example: '11999998888'
+        is_ativo:
+          type: boolean
+          example: true
+
+    CriacaoUsuarioRequest:
+      type: object
+      required:
+        - nome_completo
+        - email
+        - senha
+      properties:
+        nome_completo:
+          type: string
+          example: 'João da Silva'
+        email:
+          type: string
+          format: email
+          example: 'joao.silva@acme.com'
+        senha:
+          type: string
+          format: password
+          example: 'SenhaForte123!'
+
+    AtualizacaoUsuarioRequest:
+      type: object
+      properties:
+        nome_completo:
+          type: string
+          example: 'João da Silva Santos'
+        is_ativo:
+          type: boolean
+          description: Usado para ativar ou desativar o acesso de um usuário.
+          example: false
+
+    UsuarioResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        locatario_id:
+          type: string
+          format: uuid
+        nome_completo:
+          type: string
+        email:
+          type: string
+        is_ativo:
+          type: boolean
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - senha
+        - numero_documento_locatario
+      properties:
+        email:
+          type: string
+          format: email
+          example: "admin@acme.com"
+        senha:
+          type: string
+          format: password
+          example: "SenhaForte123!"
+        numero_documento_locatario:
+          type: string
+          description: Número do documento (CNPJ/CPF) do locatário que o usuário está a tentar aceder.
+          example: "12.345.678/0001-99"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        user:
+          $ref: '#/components/schemas/UsuarioResponse'
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
